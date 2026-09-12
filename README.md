@@ -1,56 +1,71 @@
-<p align="center">
-<img src="https://raw.githubusercontent.com/ivoronin/TomatoBar/main/TomatoBar/Assets.xcassets/AppIcon.appiconset/icon_128x128%402x.png" width="128" height="128"/>
-<p>
- 
-<h1 align="center">TomatoBar fork</h1>
-<p align="center">
-<img src="https://img.shields.io/github/actions/workflow/status/ivoronin/TomatoBar/main.yml?branch=main"/> <img src="https://img.shields.io/github/downloads/ivoronin/TomatoBar/total"/> <img src="https://img.shields.io/github/v/release/ivoronin/TomatoBar?display_name=tag"/> <img src="https://img.shields.io/homebrew/cask/v/tomatobar"/>
-</p>
+# TomatoBar (Linux)
 
-<img
-  src="https://github.com/ivoronin/TomatoBar/raw/main/screenshot.png?raw=true"
-  alt="Screenshot"
-  width="50%"
-  align="right"
-/>
+Pomodoro timer for the Ubuntu/GNOME **top bar**. Practical port of the macOS TomatoBar fork.
 
-## Overview
-Have you ever heard of Pomodoro? It’s a great technique to help you keep track of time and stay on task during your studies or work. Read more about it on <a href="https://en.wikipedia.org/wiki/Pomodoro_Technique">Wikipedia</a>.
+## Features (v1.0)
 
-TomatoBar is world's neatest Pomodoro timer for the macOS menu bar. All the essential features are here - configurable
-work and rest intervals, optional sounds, discreet actionable notifications, global hotkey.
+- Work → short rest → (after N works) long rest cycle
+- Countdown next to the tray icon via Ayatana label (idle / W / R / L / pause)
+- Start / Stop / Pause / Skip / +1 minute
+- 4 presets and configurable intervals (up to 120 minutes)
+- Start with work or rest; stop-after options
+- Sounds: windup, ding, ticking via PulseAudio (`paplay`)
+- Desktop notifications with Skip on rest
+- Optional GNOME Do Not Disturb during work
+- Optional fullscreen rest mask (GTK)
+- Autostart / launch at login
+- JSONL event log
+- CLI + D-Bus control
 
-TomatoBar is fully sandboxed with no entitlements (except for the Apple Events entitlement, used to run the Do Not Disturb toggle shortcut).
+## Prerequisites (Ubuntu 24.04)
 
-## Fork notes
-This fork makes a couple additions/modifications:
+1. GNOME extension **AppIndicator and KStatusNotifierItem Support**
+2. Runtime tools (usually preinstalled):
 
-- Increases the maximum timer duration to 2 hours/120 minutes
-- Adds an option to toggle Do Not Disturb automatically using a shortcut. The first time you start the timer you'll be prompted to add the shortcut, it will work fine afterwards (also PRed to https://github.com/ivoronin/TomatoBar/pull/82)
-- Adds sound customization: to use, open the sound folder from settings and place audio files named "windup", "ding" or "ticking" in mp3 or m4a/mp4 (aac/alac) format
-- Adds a preset selector with 4 presets you can quickly switch between
-- Adds a pause button, keyboard shortcut and URL (based on https://github.com/ivoronin/TomatoBar/pull/52)
-- Adds a skip button, keyboard shortcut and URL which can skip both work and rest (in addition to the existing rest skip notification)
-- Adds an "add a minute" button, keyboard shortcut and URL
-- Extends "stop after break" with "work" and "set" options
-- Adds a "start with break" option
-- Adds a "start timer on launch" option
-- Makes numbers in the settings editable (based on https://github.com/ivoronin/TomatoBar/pull/63)
-- Displays current interval on the start/stop button when "Stop after" is disabled
-- Turns the volume display into a percentage, adds long tap gesture on the percentage to mute/unmute (in addition to the existing double tap reset)
-- Adds an option for a full screen mask (taken from https://github.com/ivoronin/TomatoBar/pull/65)
-- Doesn't play sounds when volume is set to zero (fixes issues with e.g. multipoint bluetooth headphones)
-- Increases the minimum macOS version requirement to Monterey
+```bash
+sudo apt install python3-gi python3-gi-cairo gir1.2-gtk-4.0 gir1.2-adw-1 pulseaudio-utils libnotify-bin
+```
 
-## Integration with other tools
-### Event log
-TomatoBar logs state transitions in JSON format to `~/Library/Containers/com.github.ivoronin.TomatoBar/Data/Library/Caches/TomatoBar.log`. Use this data to analyze your productivity and enrich other data sources.
-### Controlling the timer
-TomatoBar can be controlled using `tomatobar://` URLs. To start or stop the timer from the command line, use `open tomatobar://startStop`. To pause or resume use `open tomatobar://pauseResume`. To skip use `open tomatobar://skip`. To add a minute use `open tomatobar://addMinute`
+## Usage
 
-## Older versions
-Touch bar integration and older macOS versions (earlier than Big Sur) are supported by TomatoBar versions prior to 3.0
+```bash
+cd tomatobar
+make setup
+make run
+```
 
-## Licenses
- - Timer sounds are licensed from buddhabeats
- - "macos-focus-mode.shortcut" is taken from the <a href="https://github.com/arodik/macos-focus-mode">macos-focus-mode</a> project under the MIT license.
+Install to `~/.local`:
+
+```bash
+make install
+tomatobar
+```
+
+### Tray menu
+
+Start, Stop, Pause/Resume, Skip, +1 minute, Settings…, Open sound folder, Quit.
+
+### CLI (app must already be running)
+
+```bash
+tomatobar status
+tomatobar start          # toggle start/stop
+tomatobar pause
+tomatobar skip
+tomatobar add-minute
+tomatobar stop
+```
+
+### Config and data
+
+| Path | Purpose |
+|------|---------|
+| `~/.config/tomatobar/config.json` | Settings / presets / volumes |
+| `~/.local/share/tomatobar/sounds/` | `windup` / `ding` / `ticking` (wav/mp3/ogg) |
+| `~/.local/share/tomatobar/events.jsonl` | State transition log |
+
+Settings UI is a GTK4/libadwaita window launched via `scripts/settings.py`.
+
+## Out of scope (post-v1)
+
+Global hotkeys (Wayland), `tomatobar://` URL scheme, Flatpak packaging.

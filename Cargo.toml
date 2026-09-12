@@ -1,0 +1,12 @@
+[package]
+name = "tomatobar"
+version = "1.0.0"
+edition = "2021"
+description = "Pomodoro timer for the Ubuntu/GNOME top bar"
+license = "MIT"
+
+[dependencies]
+ksni = { path = "third_party/ksni" }
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "time", "sync", "signal"] }
+image = { version = "0.25", default-features = false, features = ["png"] }
+zbus = { version = "5", default-features = false, features = ["tokio"] }
