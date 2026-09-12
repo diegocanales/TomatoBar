@@ -79,10 +79,21 @@ async fn run_daemon() -> Result<(), String> {
 
     let audio = Audio::new();
 
+    // Refresh ~/.config/autostart entry (e.g. after install path / scripts change).
+    {
+        let exe = std::env::current_exe()
+            .ok()
+            .and_then(|p| p.into_os_string().into_string().ok())
+            .unwrap_or_else(|| "tomatobar".into());
+        autostart::sync_autostart(config.autostart, &exe);
+    }
+
     let tray = TomatoTray {
         shared: shared.clone(),
     };
-    let handle = ksni::TrayMethods::spawn(tray)
+    // AppIndicator may not be ready yet at session login; wait for the watcher.
+    let handle = ksni::TrayMethods::assume_sni_available(tray, true)
+        .spawn()
         .await
         .map_err(|e| format!("failed to show tray icon (is AppIndicator enabled?): {e}"))?;
 

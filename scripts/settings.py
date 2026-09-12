@@ -59,17 +59,35 @@ def save_config(cfg: dict) -> None:
     sync_autostart(bool(cfg.get("autostart")))
 
 
+def scripts_dir() -> Path | None:
+    env = os.environ.get("TOMATOBAR_SCRIPTS")
+    if env and Path(env).is_dir():
+        return Path(env)
+    installed = Path.home() / ".local/share/tomatobar/scripts"
+    if installed.is_dir():
+        return installed
+    here = Path(__file__).resolve().parent
+    if here.is_dir():
+        return here
+    return None
+
+
 def sync_autostart(enabled: bool) -> None:
     if enabled:
         AUTOSTART.parent.mkdir(parents=True, exist_ok=True)
         exe = os.environ.get("TOMATOBAR_BIN", "tomatobar")
+        scripts = scripts_dir()
+        exec_line = f"env TOMATOBAR_SCRIPTS={scripts} {exe}" if scripts else exe
         AUTOSTART.write_text(
             "[Desktop Entry]\n"
             "Type=Application\n"
             "Name=TomatoBar\n"
-            "Exec=" + exe + "\n"
+            "Comment=Pomodoro timer for the GNOME top bar\n"
+            f"Exec={exec_line}\n"
             "Icon=tomatobar\n"
             "Terminal=false\n"
+            "Categories=Utility;Clock;\n"
+            "StartupNotify=false\n"
             "X-GNOME-Autostart-enabled=true\n"
         )
     elif AUTOSTART.exists():
