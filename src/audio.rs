@@ -1,16 +1,24 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
-use std::sync::Mutex;
-
-#[cfg(unix)]
-use std::os::unix::process::CommandExt;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread;
+use std::time::Duration;
 
 use crate::config::{xdg_open, Config};
 
+/// Looping tick sound. Never signals process groups (TomatoBar shares the
+/// gnome-session PGID; `kill(-pgid, …)` can tear down the whole user session).
+struct Ticking {
+    stop: Arc<AtomicBool>,
+    paplay: Arc<Mutex<Option<Child>>>,
+    join: Option<thread::JoinHandle<()>>,
+}
+
 pub struct Audio {
     bundled_dir: PathBuf,
-    ticking: Mutex<Option<Child>>,
+    ticking: Mutex<Option<Ticking>>,
 }
 
 impl Audio {
@@ -82,54 +90,85 @@ impl Audio {
             return;
         };
         let vol = ((volume.clamp(0.0, 2.0)) * 32768.0) as i32;
-        // Own process group so Ctrl+C / stop can kill bash + paplay together.
-        let mut cmd = Command::new("bash");
-        cmd.arg("-c")
-            .arg(format!(
-                "while true; do paplay --volume {vol} '{}'; done",
-                path.display()
-            ))
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null());
-        #[cfg(unix)]
-        unsafe {
-            cmd.pre_exec(|| {
-                // Become leader of a new process group (pgid == pid).
-                if libc_setpgid(0, 0) != 0 {
-                    return Err(std::io::Error::last_os_error());
+        let stop = Arc::new(AtomicBool::new(false));
+        let paplay = Arc::new(Mutex::new(None));
+        let stop_t = stop.clone();
+        let paplay_t = paplay.clone();
+        let join = thread::spawn(move || {
+            while !stop_t.load(Ordering::SeqCst) {
+                let child = match Command::new("paplay")
+                    .arg("--volume")
+                    .arg(vol.to_string())
+                    .arg(&path)
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .spawn()
+                {
+                    Ok(c) => c,
+                    Err(_) => break,
+                };
+                match paplay_t.lock() {
+                    Ok(mut slot) => *slot = Some(child),
+                    Err(_) => break,
                 }
-                Ok(())
-            });
-        }
-        let child = cmd.spawn().ok();
+
+                loop {
+                    if stop_t.load(Ordering::SeqCst) {
+                        break;
+                    }
+                    let done = {
+                        let mut slot = match paplay_t.lock() {
+                            Ok(s) => s,
+                            Err(_) => break,
+                        };
+                        match slot.as_mut() {
+                            Some(c) => match c.try_wait() {
+                                Ok(Some(_)) => true,
+                                Ok(None) => false,
+                                Err(_) => true,
+                            },
+                            None => true,
+                        }
+                    };
+                    if done {
+                        break;
+                    }
+                    thread::sleep(Duration::from_millis(50));
+                }
+
+                if let Ok(mut slot) = paplay_t.lock() {
+                    if let Some(mut c) = slot.take() {
+                        let _ = c.kill();
+                        let _ = c.wait();
+                    }
+                }
+            }
+        });
         if let Ok(mut g) = self.ticking.lock() {
-            *g = child;
+            *g = Some(Ticking {
+                stop,
+                paplay,
+                join: Some(join),
+            });
         }
     }
 
     pub fn stop_ticking(&self) {
-        if let Ok(mut g) = self.ticking.lock() {
-            if let Some(mut child) = g.take() {
-                let pid = child.id();
-                #[cfg(unix)]
-                {
-                    // Kill the whole process group (bash + paplay children).
-                    let _ = Command::new("kill")
-                        .args(["-TERM", &format!("-{pid}")])
-                        .status();
-                    let _ = Command::new("kill")
-                        .args(["-KILL", &format!("-{pid}")])
-                        .status();
-                }
+        let Some(mut ticking) = self.ticking.lock().ok().and_then(|mut g| g.take()) else {
+            return;
+        };
+        ticking.stop.store(true, Ordering::SeqCst);
+        // Kill only the tracked paplay PID (never a process group).
+        if let Ok(mut slot) = ticking.paplay.lock() {
+            if let Some(mut child) = slot.take() {
                 let _ = child.kill();
                 let _ = child.wait();
             }
         }
-        // Belt-and-suspenders: stop any orphaned paplay of our ticking file.
-        let _ = Command::new("pkill")
-            .args(["-f", "paplay .*ticking"])
-            .status();
+        if let Some(join) = ticking.join.take() {
+            let _ = join.join();
+        }
     }
 
     pub fn open_sound_folder() {
@@ -143,13 +182,4 @@ impl Drop for Audio {
     fn drop(&mut self) {
         self.stop_ticking();
     }
-}
-
-#[cfg(unix)]
-unsafe fn libc_setpgid(pid: i32, pgid: i32) -> i32 {
-    // Avoid adding a libc crate: call setpgid via libc linkage from std.
-    extern "C" {
-        fn setpgid(pid: i32, pgid: i32) -> i32;
-    }
-    setpgid(pid, pgid)
 }
