@@ -195,6 +195,13 @@ async fn run_daemon() -> Result<(), String> {
                                         .unwrap_or_else(|| "tomatobar".into());
                                     autostart::sync_autostart(cfg.autostart, &exe);
                                     t.reload_config(cfg);
+                                    let cfg = t.config.clone();
+                                    // Apply volume / mute changes without requiring pause/resume.
+                                    if t.phase == Phase::Work && !t.paused {
+                                        audio.start_ticking(cfg.ticking_volume);
+                                    } else {
+                                        audio.stop_ticking();
+                                    }
                                     vec![]
                                 }
                                 _ => vec![],

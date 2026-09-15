@@ -3,9 +3,11 @@ use std::process::Command;
 use tokio::sync::mpsc::UnboundedSender;
 
 pub fn notify_break_over() {
-    let _ = Command::new("notify-send")
-        .args(["-t", "6000", "Break is over", "Back to work."])
-        .spawn();
+    std::thread::spawn(|| {
+        let _ = Command::new("notify-send")
+            .args(["-t", "6000", "Break is over", "Back to work."])
+            .status();
+    });
 }
 
 pub fn show_rest_notification(long: bool, skip_tx: UnboundedSender<()>) {

@@ -59,14 +59,21 @@ impl Audio {
             return;
         }
         let vol = ((volume.clamp(0.0, 2.0)) * 32768.0) as i32;
-        let _ = Command::new("paplay")
-            .arg("--volume")
-            .arg(vol.to_string())
-            .arg(path)
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .spawn();
+        let path = path.to_path_buf();
+        // Wait in a helper thread so exited paplay is reaped (no zombies).
+        thread::spawn(move || {
+            if let Ok(mut child) = Command::new("paplay")
+                .arg("--volume")
+                .arg(vol.to_string())
+                .arg(&path)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+            {
+                let _ = child.wait();
+            }
+        });
     }
 
     pub fn play_windup(&self, volume: f32) {
@@ -124,9 +131,16 @@ impl Audio {
                         };
                         match slot.as_mut() {
                             Some(c) => match c.try_wait() {
-                                Ok(Some(_)) => true,
+                                Ok(Some(_)) => {
+                                    // Already reaped; drop the Child handle.
+                                    let _ = slot.take();
+                                    true
+                                }
                                 Ok(None) => false,
-                                Err(_) => true,
+                                Err(_) => {
+                                    let _ = slot.take();
+                                    true
+                                }
                             },
                             None => true,
                         }
@@ -137,6 +151,7 @@ impl Audio {
                     thread::sleep(Duration::from_millis(50));
                 }
 
+                // Still running (stop requested): kill and reap this paplay only.
                 if let Ok(mut slot) = paplay_t.lock() {
                     if let Some(mut c) = slot.take() {
                         let _ = c.kill();
