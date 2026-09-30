@@ -34,6 +34,7 @@ impl ksni::Tray for TomatoTray {
     fn title(&self) -> String {
         self.with_timer(|t| match t.phase {
             Phase::Idle => "TomatoBar".into(),
+            Phase::AwaitingUser => "Waiting for you".into(),
             _ => {
                 let mut s = t.display_time();
                 if t.paused {
@@ -73,6 +74,10 @@ impl ksni::Tray for TomatoTray {
                 ),
                 Phase::ShortRest => (t.display_time(), "Short rest".into()),
                 Phase::LongRest => (t.display_time(), "Long rest".into()),
+                Phase::AwaitingUser => (
+                    "Waiting for you".into(),
+                    "Rest over. Work starts when you are back.".into(),
+                ),
             };
             ksni::ToolTip {
                 title,
@@ -105,12 +110,31 @@ impl ksni::Tray for TomatoTray {
                 }
                 .into(),
             );
+        } else if phase == Phase::AwaitingUser {
+            items.push(
+                StandardItem {
+                    label: "Stop".into(),
+                    icon_name: "media-playback-stop".into(),
+                    activate: Box::new(|this: &mut Self| this.send(AppCommand::Stop)),
+                    ..Default::default()
+                }
+                .into(),
+            );
+            items.push(
+                StandardItem {
+                    label: "Start work".into(),
+                    icon_name: "media-skip-forward".into(),
+                    activate: Box::new(|this: &mut Self| this.send(AppCommand::Skip)),
+                    ..Default::default()
+                }
+                .into(),
+            );
         } else {
             let stop_label = match phase {
                 Phase::Work => format!("Stop work ({remaining})"),
                 Phase::ShortRest => format!("Stop rest ({remaining})"),
                 Phase::LongRest => format!("Stop long rest ({remaining})"),
-                Phase::Idle => remaining,
+                Phase::AwaitingUser | Phase::Idle => remaining,
             };
             items.push(
                 StandardItem {

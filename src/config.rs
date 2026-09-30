@@ -69,6 +69,8 @@ pub struct Config {
     pub show_timer_in_icon: bool,
     pub toggle_dnd: bool,
     pub show_fullscreen_mask: bool,
+    /// After a rest, wait until the user is active before starting the next work.
+    pub hold_work_until_active: bool,
     pub autostart: bool,
     pub windup_volume: f32,
     pub ding_volume: f32,
@@ -91,6 +93,7 @@ impl Default for Config {
             show_timer_in_icon: true,
             toggle_dnd: false,
             show_fullscreen_mask: false,
+            hold_work_until_active: false,
             autostart: false,
             windup_volume: 1.0,
             ding_volume: 1.0,
@@ -238,6 +241,9 @@ impl Config {
         if let Some(v) = extract_bool(&text, "show_fullscreen_mask") {
             cfg.show_fullscreen_mask = v;
         }
+        if let Some(v) = extract_bool(&text, "hold_work_until_active") {
+            cfg.hold_work_until_active = v;
+        }
         if let Some(v) = extract_bool(&text, "autostart") {
             cfg.autostart = v;
         }
@@ -283,7 +289,7 @@ impl Config {
             StopAfter::LongRest => "long_rest",
         };
         let text = format!(
-            "{{\n  \"current_preset\": {},\n  \"presets\": [{}],\n  \"start_with\": \"{}\",\n  \"stop_after\": \"{}\",\n  \"start_timer_on_launch\": {},\n  \"show_timer_in_icon\": {},\n  \"toggle_dnd\": {},\n  \"show_fullscreen_mask\": {},\n  \"autostart\": {},\n  \"windup_volume\": {},\n  \"ding_volume\": {},\n  \"ticking_volume\": {}\n}}\n",
+            "{{\n  \"current_preset\": {},\n  \"presets\": [{}],\n  \"start_with\": \"{}\",\n  \"stop_after\": \"{}\",\n  \"start_timer_on_launch\": {},\n  \"show_timer_in_icon\": {},\n  \"toggle_dnd\": {},\n  \"show_fullscreen_mask\": {},\n  \"hold_work_until_active\": {},\n  \"autostart\": {},\n  \"windup_volume\": {},\n  \"ding_volume\": {},\n  \"ticking_volume\": {}\n}}\n",
             cfg.current_preset,
             presets,
             start_with,
@@ -292,6 +298,7 @@ impl Config {
             json_bool(cfg.show_timer_in_icon),
             json_bool(cfg.toggle_dnd),
             json_bool(cfg.show_fullscreen_mask),
+            json_bool(cfg.hold_work_until_active),
             json_bool(cfg.autostart),
             cfg.windup_volume,
             cfg.ding_volume,

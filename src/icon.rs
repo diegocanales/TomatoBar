@@ -43,7 +43,7 @@ pub fn phase_base_icon(phase: Phase, paused: bool) -> &'static ksni::Icon {
     match phase {
         Phase::Idle => &IDLE_ICON,
         Phase::Work => &WORK_ICON,
-        Phase::ShortRest => &REST_ICON,
+        Phase::ShortRest | Phase::AwaitingUser => &REST_ICON,
         Phase::LongRest => &LONG_REST_ICON,
     }
 }
@@ -56,6 +56,9 @@ pub fn tray_icon(timer: &Timer) -> ksni::Icon {
 
 /// Text next to the icon when `show_timer_in_icon` is on (empty = hide label).
 pub fn tray_label(timer: &Timer) -> String {
+    if timer.phase == Phase::AwaitingUser {
+        return String::new();
+    }
     if timer.phase.is_running() && timer.config.show_timer_in_icon {
         timer.display_time()
     } else {
@@ -65,6 +68,9 @@ pub fn tray_label(timer: &Timer) -> String {
 
 /// Fixed guide so the panel reserves width for `mm:ss` and does not jiggle.
 pub fn tray_label_guide(timer: &Timer) -> String {
+    if timer.phase == Phase::AwaitingUser {
+        return String::new();
+    }
     if timer.phase.is_running() && timer.config.show_timer_in_icon {
         "88:88".into()
     } else {

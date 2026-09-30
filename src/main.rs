@@ -5,6 +5,7 @@ mod dbus_api;
 mod dnd;
 mod event_log;
 mod icon;
+mod idle;
 mod notify;
 mod timer;
 mod tray;
@@ -106,6 +107,7 @@ async fn run_daemon() -> Result<(), String> {
     }
 
     let (skip_tx, mut skip_rx) = mpsc::unbounded_channel::<()>();
+    let mut activity = idle::ActivityWatch::new();
 
     let mut ticker = tokio::time::interval(Duration::from_secs(1));
     ticker.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
@@ -124,18 +126,19 @@ async fn run_daemon() -> Result<(), String> {
                 break;
             }
             _ = ticker.tick() => {
-                let (events, before, after, cfg, paused) = {
+                let (mut events, before, mut after, cfg, paused) = {
                     let mut t = shared.timer.lock().await;
                     let before = t.phase;
                     let events = t.tick();
                     let after = t.phase;
-                    for ev in &events {
-                        if matches!(ev, TimerEvent::EnteredWork | TimerEvent::EnteredShortRest | TimerEvent::EnteredLongRest | TimerEvent::EnteredIdle) {
-                            event_log::append_transition(before, after, *ev);
-                        }
-                    }
                     (events, before, after, t.config.clone(), t.paused)
                 };
+                if after == Phase::AwaitingUser && activity.user_is_active().await {
+                    let mut t = shared.timer.lock().await;
+                    events.extend(t.begin_work_if_held());
+                    after = t.phase;
+                }
+                log_transitions(before, after, &events);
                 apply_side_effects(&events, before, after, &cfg, paused, &audio, &cmd_tx, &skip_tx);
                 handle.update(|_| {}).await;
             }
@@ -207,9 +210,7 @@ async fn run_daemon() -> Result<(), String> {
                                 _ => vec![],
                             };
                             let after = t.phase;
-                            for ev in &events {
-                                event_log::append_transition(before, after, *ev);
-                            }
+                            log_transitions(before, after, &events);
                             (events, before, after, t.config.clone(), t.paused)
                         };
                         apply_side_effects(&events, before, after, &cfg, paused, &audio, &cmd_tx, &skip_tx);
@@ -226,6 +227,21 @@ async fn run_daemon() -> Result<(), String> {
     Ok(())
 }
 
+fn log_transitions(before: Phase, after: Phase, events: &[TimerEvent]) {
+    for ev in events {
+        if matches!(
+            ev,
+            TimerEvent::EnteredWork
+                | TimerEvent::EnteredShortRest
+                | TimerEvent::EnteredLongRest
+                | TimerEvent::EnteredAwaitingUser
+                | TimerEvent::EnteredIdle
+        ) {
+            event_log::append_transition(before, after, *ev);
+        }
+    }
+}
+
 fn apply_side_effects(
     events: &[TimerEvent],
     from: Phase,
@@ -236,10 +252,22 @@ fn apply_side_effects(
     cmd_tx: &mpsc::UnboundedSender<AppCommand>,
     skip_tx: &mpsc::UnboundedSender<()>,
 ) {
+    let started_work = events
+        .iter()
+        .any(|ev| matches!(ev, TimerEvent::EnteredWork));
     for ev in events {
         match ev {
+            TimerEvent::EnteredAwaitingUser => {
+                // Same tick promoted to work: user was already active, keep today's windup only.
+                if !started_work {
+                    audio.play_ding(config.ding_volume);
+                }
+            }
             TimerEvent::EnteredWork => {
-                if matches!(from, Phase::ShortRest | Phase::LongRest) {
+                if matches!(
+                    from,
+                    Phase::ShortRest | Phase::LongRest | Phase::AwaitingUser
+                ) {
                     notify::notify_break_over();
                 }
                 audio.play_windup(config.windup_volume);

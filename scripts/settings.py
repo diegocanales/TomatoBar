@@ -34,6 +34,7 @@ def default_config() -> dict:
         "show_timer_in_icon": True,
         "toggle_dnd": False,
         "show_fullscreen_mask": False,
+        "hold_work_until_active": False,
         "autostart": False,
         "windup_volume": 1.0,
         "ding_volume": 1.0,
@@ -161,6 +162,10 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.show_timer = add_switch("Show timer next to icon", self.cfg.get("show_timer_in_icon", True))
         self.dnd = add_switch("Do Not Disturb during work", self.cfg.get("toggle_dnd", False))
         self.mask = add_switch("Fullscreen mask on rest", self.cfg.get("show_fullscreen_mask", False))
+        self.hold_work = add_switch(
+            "Start work when active",
+            self.cfg.get("hold_work_until_active", False),
+        )
         self.autostart = add_switch("Launch at login", self.cfg.get("autostart", False))
 
         box.append(Gtk.Label(label="Volumes (0–200%)", xalign=0, css_classes=["title-4"]))
@@ -202,6 +207,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.cfg["show_timer_in_icon"] = self.show_timer.get_active()
         self.cfg["toggle_dnd"] = self.dnd.get_active()
         self.cfg["show_fullscreen_mask"] = self.mask.get_active()
+        self.cfg["hold_work_until_active"] = self.hold_work.get_active()
         self.cfg["autostart"] = self.autostart.get_active()
         self.cfg["windup_volume"] = self.windup.get_value() / 100.0
         self.cfg["ding_volume"] = self.ding.get_value() / 100.0

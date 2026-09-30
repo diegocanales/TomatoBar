@@ -18,6 +18,7 @@ pub fn append_transition(from: Phase, to: Phase, event: TimerEvent) {
         TimerEvent::EnteredWork => "entered_work",
         TimerEvent::EnteredShortRest => "entered_short_rest",
         TimerEvent::EnteredLongRest => "entered_long_rest",
+        TimerEvent::EnteredAwaitingUser => "entered_awaiting_user",
         TimerEvent::EnteredIdle => "entered_idle",
         TimerEvent::Skipped => "skipped",
     };

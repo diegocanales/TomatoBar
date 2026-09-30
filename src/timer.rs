@@ -6,6 +6,8 @@ pub enum Phase {
     Work,
     ShortRest,
     LongRest,
+    /// Rest finished. Next work starts when the user is active again.
+    AwaitingUser,
 }
 
 impl Phase {
@@ -19,6 +21,7 @@ impl Phase {
             Phase::Work => "work",
             Phase::ShortRest => "short_rest",
             Phase::LongRest => "long_rest",
+            Phase::AwaitingUser => "awaiting_user",
         }
     }
 }
@@ -28,6 +31,7 @@ pub enum TimerEvent {
     EnteredWork,
     EnteredShortRest,
     EnteredLongRest,
+    EnteredAwaitingUser,
     EnteredIdle,
     Skipped,
 }
@@ -97,7 +101,7 @@ impl Timer {
     }
 
     pub fn pause_resume(&mut self) {
-        if !self.phase.is_running() {
+        if !self.phase.is_running() || self.phase == Phase::AwaitingUser {
             return;
         }
         self.paused = !self.paused;
@@ -114,7 +118,7 @@ impl Timer {
     }
 
     pub fn add_minute(&mut self) {
-        if !self.phase.is_running() {
+        if !self.phase.is_running() || self.phase == Phase::AwaitingUser {
             return;
         }
         self.remaining_secs = (self.remaining_secs + 60).min(MAX_INTERVAL_SECS);
@@ -122,7 +126,7 @@ impl Timer {
 
     /// Reset the current interval to its full duration (work or rest).
     pub fn restart_current(&mut self) {
-        if !self.phase.is_running() {
+        if !self.phase.is_running() || self.phase == Phase::AwaitingUser {
             return;
         }
         let preset = self.config.preset();
@@ -131,11 +135,23 @@ impl Timer {
             Phase::Work => preset.work_secs(),
             Phase::ShortRest => preset.short_rest_secs(),
             Phase::LongRest => preset.long_rest_secs(),
+            Phase::AwaitingUser => 0,
         };
         self.paused = false;
     }
 
+    /// Leave `AwaitingUser` and start the next work interval.
+    pub fn begin_work_if_held(&mut self) -> Vec<TimerEvent> {
+        if self.phase != Phase::AwaitingUser {
+            return vec![];
+        }
+        self.enter_work()
+    }
+
     pub fn tick(&mut self) -> Vec<TimerEvent> {
+        if self.phase == Phase::AwaitingUser {
+            return vec![];
+        }
         if !self.phase.is_running() || self.paused {
             return vec![];
         }
@@ -185,6 +201,21 @@ impl Timer {
         vec![TimerEvent::EnteredLongRest]
     }
 
+    fn enter_awaiting_user(&mut self) -> Vec<TimerEvent> {
+        self.phase = Phase::AwaitingUser;
+        self.remaining_secs = 0;
+        self.paused = false;
+        vec![TimerEvent::EnteredAwaitingUser]
+    }
+
+    fn after_rest(&mut self) -> Vec<TimerEvent> {
+        if self.config.hold_work_until_active {
+            self.enter_awaiting_user()
+        } else {
+            self.enter_work()
+        }
+    }
+
     fn advance_phase(&mut self) -> Vec<TimerEvent> {
         match self.phase {
             Phase::Idle => vec![],
@@ -209,7 +240,7 @@ impl Timer {
                 if self.config.stop_after == StopAfter::Rest {
                     return self.stop();
                 }
-                self.enter_work()
+                self.after_rest()
             }
             Phase::LongRest => {
                 if matches!(
@@ -218,8 +249,9 @@ impl Timer {
                 ) {
                     return self.stop();
                 }
-                self.enter_work()
+                self.after_rest()
             }
+            Phase::AwaitingUser => self.enter_work(),
         }
     }
 }
