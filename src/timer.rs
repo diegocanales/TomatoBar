@@ -226,7 +226,7 @@ impl Timer {
                 let preset = self.config.preset().clone();
                 if self.current_work >= preset.works_in_set {
                     if self.config.stop_after == StopAfter::LongRest {
-                        // still show long rest, then idle after it — handled when leaving long rest
+                        // still show long rest, then idle after it. Handled when leaving long rest.
                     }
                     self.enter_long_rest()
                 } else {

@@ -12,9 +12,9 @@ pub fn notify_break_over() {
 
 pub fn show_rest_notification(long: bool, skip_tx: UnboundedSender<()>) {
     let body = if long {
-        "Long break — you've earned it."
+        "Long break. You've earned it."
     } else {
-        "Short break — stretch for a few minutes."
+        "Short break. Stretch for a few minutes."
     };
     // Actionable notifications via notify-send (GNOME): --action returns the key on stdout.
     std::thread::spawn(move || {

@@ -24,7 +24,7 @@ use tray::TomatoTray;
 
 fn print_help() {
     eprintln!(
-        "TomatoBar — Pomodoro for the GNOME top bar\n\n\
+        "TomatoBar: Pomodoro for the GNOME top bar\n\n\
 Usage:\n\
   tomatobar                 Run the tray app\n\
   tomatobar start           Toggle start/stop (requires running app)\n\
@@ -292,9 +292,9 @@ fn apply_side_effects(
                 notify::show_rest_notification(long, skip_tx.clone());
                 if config.show_fullscreen_mask {
                     let body = if long {
-                        "Long break — you've earned it.".into()
+                        "Long break. You've earned it.".into()
                     } else {
-                        "Short break — stretch for a few minutes.".into()
+                        "Short break. Stretch for a few minutes.".into()
                     };
                     ui_bridge::show_mask(body, cmd_tx.clone());
                 }

@@ -63,7 +63,7 @@ impl ksni::Tray for TomatoTray {
     fn tool_tip(&self) -> ksni::ToolTip {
         self.with_timer(|t| {
             let (title, description) = match t.phase {
-                Phase::Idle => ("TomatoBar".into(), "Idle — Start from the menu".into()),
+                Phase::Idle => ("TomatoBar".into(), "Idle. Start from the menu.".into()),
                 Phase::Work => (
                     t.display_time(),
                     if t.paused {
