@@ -16,23 +16,28 @@ REST_PHASES = {"short_rest", "long_rest"}
 def read_status() -> str | None:
     try:
         bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
-        reply = bus.call_sync(
-            "org.tomatobar.App",
-            "/org/tomatobar/App",
-            "org.tomatobar.App1",
-            "Status",
-            None,
-            GLib.VariantType.new("(s)"),
-            Gio.DBusCallFlags.NONE,
-            500,
-            None,
-        )
+    except Exception:
+        return None
+    for sig in ("(s)", "s"):
+        try:
+            reply = bus.call_sync(
+                "org.tomatobar.App",
+                "/org/tomatobar/App",
+                "org.tomatobar.App1",
+                "Status",
+                None,
+                GLib.VariantType.new(sig),
+                Gio.DBusCallFlags.NONE,
+                500,
+                None,
+            )
+        except Exception:
+            continue
         value = reply.unpack()
         if isinstance(value, tuple):
             return str(value[0]) if value else None
         return str(value)
-    except Exception:
-        return None
+    return None
 
 
 def parse_status(status: str) -> dict[str, str]:

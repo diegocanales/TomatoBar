@@ -98,7 +98,9 @@ async fn run_daemon() -> Result<(), String> {
         .await
         .map_err(|e| format!("failed to show tray icon (is AppIndicator enabled?): {e}"))?;
 
-    if let Err(e) = serve_dbus(shared.clone()).await {
+    // Keep the connection. Dropping it releases org.tomatobar.App and Status disappears.
+    let dbus_conn = serve_dbus(shared.clone()).await;
+    if let Err(ref e) = dbus_conn {
         eprintln!("warning: D-Bus service not available ({e}); CLI control disabled");
     }
 
