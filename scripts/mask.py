@@ -10,7 +10,8 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gdk, Gio, GLib, Gtk  # noqa: E402
 
-REST_PHASES = {"short_rest", "long_rest"}
+# Stay up through the idle wait. Close when work starts or the timer stops.
+OPEN_PHASES = {"short_rest", "long_rest", "awaiting_user"}
 
 
 def read_status() -> str | None:
@@ -96,15 +97,28 @@ def main():
                 return True
             fields = parse_status(status)
             phase = fields.get("phase", "")
-            if phase not in REST_PHASES:
+            if phase not in OPEN_PHASES:
                 win.close()
                 return False
+            if phase == "awaiting_user":
+                title.set_label("Waiting for you")
+                time_l.set_visible(False)
+                paused_l.set_visible(False)
+                body_l.set_label("Work starts when you are back.")
+                skip.set_label("Start work")
+                return True
+            title.set_label("Break time")
+            time_l.set_visible(True)
+            skip.set_label("Skip break")
+            body_l.set_label(body)
             try:
                 secs = int(fields.get("remaining", "0"))
             except ValueError:
                 secs = 0
             time_l.set_label(format_mm_ss(secs))
-            paused_l.set_label("Paused" if fields.get("paused") == "true" else "")
+            paused = fields.get("paused") == "true"
+            paused_l.set_visible(paused)
+            paused_l.set_label("Paused" if paused else "")
             return True
 
         skip.connect("clicked", on_skip)
