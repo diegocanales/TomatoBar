@@ -1,7 +1,9 @@
 use zbus::proxy;
 
 /// Input within this window counts as the user being back at the machine.
-const ACTIVE_UNDER_MS: u64 = 3_000;
+pub const ACTIVE_UNDER_MS: u64 = 3_000;
+/// Work pauses after this much idle time when the setting is on.
+pub const WORK_IDLE_PAUSE_MS: u64 = 120_000;
 
 #[proxy(
     interface = "org.gnome.Mutter.IdleMonitor",
@@ -23,26 +25,27 @@ impl ActivityWatch {
         Self { conn: None }
     }
 
-    pub async fn user_is_active(&mut self) -> bool {
+    pub async fn idle_ms(&mut self) -> Option<u64> {
         if self.conn.is_none() {
             match zbus::Connection::session().await {
                 Ok(conn) => self.conn = Some(conn),
-                Err(_) => return true,
+                Err(_) => return None,
             }
         }
         let Some(conn) = self.conn.as_ref() else {
-            return true;
+            return None;
         };
         let Ok(proxy) = IdleMonitorProxy::new(conn).await else {
             self.conn = None;
-            return true;
+            return None;
         };
         match proxy.get_idletime().await {
-            Ok(ms) => ms < ACTIVE_UNDER_MS,
+            Ok(ms) => Some(ms),
             Err(_) => {
                 self.conn = None;
-                true
+                None
             }
         }
     }
+
 }

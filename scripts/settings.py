@@ -35,6 +35,7 @@ def default_config() -> dict:
         "toggle_dnd": False,
         "show_fullscreen_mask": False,
         "hold_work_until_active": False,
+        "pause_work_when_idle": False,
         "autostart": False,
         "windup_volume": 1.0,
         "ding_volume": 1.0,
@@ -166,6 +167,10 @@ class SettingsWindow(Adw.ApplicationWindow):
             "Start work when active",
             self.cfg.get("hold_work_until_active", False),
         )
+        self.pause_idle = add_switch(
+            "Pause work after 2 min idle",
+            self.cfg.get("pause_work_when_idle", False),
+        )
         self.autostart = add_switch("Launch at login", self.cfg.get("autostart", False))
 
         box.append(Gtk.Label(label="Volumes (0–200%)", xalign=0, css_classes=["title-4"]))
@@ -208,6 +213,7 @@ class SettingsWindow(Adw.ApplicationWindow):
         self.cfg["toggle_dnd"] = self.dnd.get_active()
         self.cfg["show_fullscreen_mask"] = self.mask.get_active()
         self.cfg["hold_work_until_active"] = self.hold_work.get_active()
+        self.cfg["pause_work_when_idle"] = self.pause_idle.get_active()
         self.cfg["autostart"] = self.autostart.get_active()
         self.cfg["windup_volume"] = self.windup.get_value() / 100.0
         self.cfg["ding_volume"] = self.ding.get_value() / 100.0

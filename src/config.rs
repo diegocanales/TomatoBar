@@ -71,6 +71,8 @@ pub struct Config {
     pub show_fullscreen_mask: bool,
     /// After a rest, wait until the user is active before starting the next work.
     pub hold_work_until_active: bool,
+    /// Pause a work interval after the user has been idle for two minutes.
+    pub pause_work_when_idle: bool,
     pub autostart: bool,
     pub windup_volume: f32,
     pub ding_volume: f32,
@@ -94,6 +96,7 @@ impl Default for Config {
             toggle_dnd: false,
             show_fullscreen_mask: false,
             hold_work_until_active: false,
+            pause_work_when_idle: false,
             autostart: false,
             windup_volume: 1.0,
             ding_volume: 1.0,
@@ -244,6 +247,9 @@ impl Config {
         if let Some(v) = extract_bool(&text, "hold_work_until_active") {
             cfg.hold_work_until_active = v;
         }
+        if let Some(v) = extract_bool(&text, "pause_work_when_idle") {
+            cfg.pause_work_when_idle = v;
+        }
         if let Some(v) = extract_bool(&text, "autostart") {
             cfg.autostart = v;
         }
@@ -289,7 +295,7 @@ impl Config {
             StopAfter::LongRest => "long_rest",
         };
         let text = format!(
-            "{{\n  \"current_preset\": {},\n  \"presets\": [{}],\n  \"start_with\": \"{}\",\n  \"stop_after\": \"{}\",\n  \"start_timer_on_launch\": {},\n  \"show_timer_in_icon\": {},\n  \"toggle_dnd\": {},\n  \"show_fullscreen_mask\": {},\n  \"hold_work_until_active\": {},\n  \"autostart\": {},\n  \"windup_volume\": {},\n  \"ding_volume\": {},\n  \"ticking_volume\": {}\n}}\n",
+            "{{\n  \"current_preset\": {},\n  \"presets\": [{}],\n  \"start_with\": \"{}\",\n  \"stop_after\": \"{}\",\n  \"start_timer_on_launch\": {},\n  \"show_timer_in_icon\": {},\n  \"toggle_dnd\": {},\n  \"show_fullscreen_mask\": {},\n  \"hold_work_until_active\": {},\n  \"pause_work_when_idle\": {},\n  \"autostart\": {},\n  \"windup_volume\": {},\n  \"ding_volume\": {},\n  \"ticking_volume\": {}\n}}\n",
             cfg.current_preset,
             presets,
             start_with,
@@ -299,6 +305,7 @@ impl Config {
             json_bool(cfg.toggle_dnd),
             json_bool(cfg.show_fullscreen_mask),
             json_bool(cfg.hold_work_until_active),
+            json_bool(cfg.pause_work_when_idle),
             json_bool(cfg.autostart),
             cfg.windup_volume,
             cfg.ding_volume,

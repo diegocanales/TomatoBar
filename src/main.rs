@@ -128,20 +128,55 @@ async fn run_daemon() -> Result<(), String> {
                 break;
             }
             _ = ticker.tick() => {
-                let (mut events, before, mut after, cfg, paused) = {
+                let (mut events, before, mut after, cfg, mut paused) = {
                     let mut t = shared.timer.lock().await;
                     let before = t.phase;
                     let events = t.tick();
                     let after = t.phase;
                     (events, before, after, t.config.clone(), t.paused)
                 };
-                if after == Phase::AwaitingUser && activity.user_is_active().await {
-                    let mut t = shared.timer.lock().await;
-                    events.extend(t.begin_work_if_held());
-                    after = t.phase;
+                let need_idle = after == Phase::AwaitingUser
+                    || (cfg.pause_work_when_idle && after == Phase::Work);
+                let idle_ms = if need_idle {
+                    activity.idle_ms().await
+                } else {
+                    None
+                };
+                if after == Phase::AwaitingUser {
+                    let active = match idle_ms {
+                        Some(ms) => ms < idle::ACTIVE_UNDER_MS,
+                        None => true,
+                    };
+                    if active {
+                        let mut t = shared.timer.lock().await;
+                        events.extend(t.begin_work_if_held());
+                        after = t.phase;
+                    }
                 }
                 log_transitions(before, after, &events);
                 apply_side_effects(&events, before, after, &cfg, paused, &audio, &cmd_tx, &skip_tx);
+                if cfg.pause_work_when_idle && after == Phase::Work {
+                    let mut t = shared.timer.lock().await;
+                    let was_paused = t.paused;
+                    if t.idle_paused {
+                        let back = match idle_ms {
+                            Some(ms) => ms < idle::ACTIVE_UNDER_MS,
+                            None => true,
+                        };
+                        if back {
+                            t.resume_from_idle();
+                        }
+                    } else if idle_ms
+                        .map(|ms| ms >= idle::WORK_IDLE_PAUSE_MS)
+                        .unwrap_or(false)
+                    {
+                        t.pause_for_idle();
+                    }
+                    if t.paused != was_paused {
+                        paused = t.paused;
+                        sync_work_running(t.phase, paused, &cfg, &audio);
+                    }
+                }
                 handle.update(|_| {}).await;
             }
             Some(cmd) = cmd_rx.recv() => {
@@ -200,6 +235,9 @@ async fn run_daemon() -> Result<(), String> {
                                         .unwrap_or_else(|| "tomatobar".into());
                                     autostart::sync_autostart(cfg.autostart, &exe);
                                     t.reload_config(cfg);
+                                    if !t.config.pause_work_when_idle {
+                                        t.resume_from_idle();
+                                    }
                                     let cfg = t.config.clone();
                                     // Apply volume / mute changes without requiring pause/resume.
                                     if t.phase == Phase::Work && !t.paused {
@@ -227,6 +265,17 @@ async fn run_daemon() -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn sync_work_running(phase: Phase, paused: bool, config: &Config, audio: &Audio) {
+    if config.toggle_dnd {
+        dnd::set_dnd(phase == Phase::Work && !paused);
+    }
+    if phase == Phase::Work && !paused {
+        audio.start_ticking(config.ticking_volume);
+    } else {
+        audio.stop_ticking();
+    }
 }
 
 fn log_transitions(before: Phase, after: Phase, events: &[TimerEvent]) {

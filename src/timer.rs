@@ -41,6 +41,8 @@ pub struct Timer {
     pub phase: Phase,
     pub remaining_secs: u32,
     pub paused: bool,
+    /// True when pause was set by idle, so activity can resume it.
+    pub idle_paused: bool,
     pub current_work: u32,
     pub config: Config,
 }
@@ -51,6 +53,7 @@ impl Timer {
             phase: Phase::Idle,
             remaining_secs: 0,
             paused: false,
+            idle_paused: false,
             current_work: 0,
             config,
         }
@@ -96,6 +99,7 @@ impl Timer {
         self.phase = Phase::Idle;
         self.remaining_secs = 0;
         self.paused = false;
+        self.idle_paused = false;
         self.current_work = 0;
         vec![TimerEvent::EnteredIdle]
     }
@@ -105,6 +109,23 @@ impl Timer {
             return;
         }
         self.paused = !self.paused;
+        self.idle_paused = false;
+    }
+
+    pub fn pause_for_idle(&mut self) {
+        if self.phase != Phase::Work || self.paused {
+            return;
+        }
+        self.paused = true;
+        self.idle_paused = true;
+    }
+
+    pub fn resume_from_idle(&mut self) {
+        if !self.idle_paused {
+            return;
+        }
+        self.paused = false;
+        self.idle_paused = false;
     }
 
     pub fn skip(&mut self) -> Vec<TimerEvent> {
@@ -112,6 +133,7 @@ impl Timer {
             return vec![];
         }
         self.paused = false;
+        self.idle_paused = false;
         let mut events = self.advance_phase();
         events.insert(0, TimerEvent::Skipped);
         events
@@ -138,6 +160,7 @@ impl Timer {
             Phase::AwaitingUser => 0,
         };
         self.paused = false;
+        self.idle_paused = false;
     }
 
     /// Leave `AwaitingUser` and start the next work interval.
@@ -175,6 +198,7 @@ impl Timer {
         self.phase = Phase::Work;
         self.remaining_secs = preset.work_secs();
         self.paused = false;
+        self.idle_paused = false;
         vec![TimerEvent::EnteredWork]
     }
 
@@ -184,6 +208,7 @@ impl Timer {
         self.phase = Phase::ShortRest;
         self.remaining_secs = self.config.preset().short_rest_secs();
         self.paused = false;
+        self.idle_paused = false;
         vec![TimerEvent::EnteredShortRest]
     }
 
@@ -191,6 +216,7 @@ impl Timer {
         self.phase = Phase::ShortRest;
         self.remaining_secs = self.config.preset().short_rest_secs();
         self.paused = false;
+        self.idle_paused = false;
         vec![TimerEvent::EnteredShortRest]
     }
 
@@ -198,6 +224,7 @@ impl Timer {
         self.phase = Phase::LongRest;
         self.remaining_secs = self.config.preset().long_rest_secs();
         self.paused = false;
+        self.idle_paused = false;
         vec![TimerEvent::EnteredLongRest]
     }
 
@@ -205,6 +232,7 @@ impl Timer {
         self.phase = Phase::AwaitingUser;
         self.remaining_secs = 0;
         self.paused = false;
+        self.idle_paused = false;
         vec![TimerEvent::EnteredAwaitingUser]
     }
 
