@@ -175,6 +175,9 @@ async fn run_daemon() -> Result<(), String> {
                     if t.paused != was_paused {
                         paused = t.paused;
                         sync_work_running(t.phase, paused, &cfg, &audio);
+                        if t.idle_paused {
+                            ui_bridge::show_idle_mask();
+                        }
                     }
                 }
                 handle.update(|_| {}).await;

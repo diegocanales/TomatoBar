@@ -37,6 +37,16 @@ pub fn open_settings(cmd_tx: UnboundedSender<AppCommand>) {
     });
 }
 
+pub fn show_idle_mask() {
+    thread::spawn(|| {
+        let _ = Command::new("python3")
+            .arg(script("idle_mask.py"))
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    });
+}
+
 pub fn show_mask(body: String, cmd_tx: UnboundedSender<AppCommand>) {
     thread::spawn(move || {
         let output = Command::new("python3")

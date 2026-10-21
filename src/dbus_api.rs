@@ -69,10 +69,11 @@ impl TomatoBarIface {
     async fn status(&self) -> String {
         let t = self.shared.timer.lock().await;
         format!(
-            "phase={} remaining={} paused={} work={}",
+            "phase={} remaining={} paused={} idle_paused={} work={}",
             t.phase.label(),
             t.remaining_secs,
             t.paused,
+            t.idle_paused,
             t.current_work
         )
     }
